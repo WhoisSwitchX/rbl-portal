@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}RBL Bank — IT Budget Portal{% endblock %}</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/css/style.css"/>
+  <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <img src="/static/images/rbl-logo.png" alt="RBL"
+         style="width:38px;height:38px;border-radius:9px;object-fit:contain;background:white;padding:3px;flex-shrink:0;"
+         onerror="this.outerHTML='<div class=\'logo-mark\'>₹B</div>'"/>
+    <div>
+      <div class="logo-title">IT Budget Portal</div>
+      <div class="logo-sub">FY 2026–27 Planning</div>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Main</div>
+    <a href="/dashboard/" class="nav-item {% if active_page == 'dashboard' %}active{% endif %}">
+      <span class="nav-icon">📊</span> Dashboard
+    </a>
+    <a href="/budget/" class="nav-item {% if active_page == 'budget' %}active{% endif %}">
+      <span class="nav-icon">📋</span> Budget Lines
+    </a>
+
+    {% if user.role.value == 'it_head' %}
+    <div class="nav-section-label">Submit</div>
+    <a href="/budget/new" class="nav-item {% if active_page == 'new_entry' %}active{% endif %}">
+      <span class="nav-icon">➕</span> Add Manually
+    </a>
+    <a href="/import/" class="nav-item {% if active_page == 'import' %}active{% endif %}">
+      <span class="nav-icon">📥</span> Import from Excel
+    </a>
+    {% endif %}
+
+    {% if user.role.value in ['admin', 'super_admin'] %}
+    <div class="nav-section-label">Approvals</div>
+    <a href="/approval/" class="nav-item {% if active_page == 'approval' %}active{% endif %}">
+      <span class="nav-icon">✅</span> Pending Approvals
+    </a>
+    {% endif %}
+
+    <div class="nav-section-label">Reports</div>
+    <a href="#" class="nav-item" onclick="showToast('Export — coming soon!','info');return false;">
+      <span class="nav-icon">📤</span> Export Excel
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="user-block">
+      <div class="user-avatar">{{ user.full_name[:2].upper() }}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="user-name">{{ user.full_name }}</div>
+        <div class="user-role">
+          {% if user.role.value == 'it_head' %}IT Head
+          {% elif user.role.value == 'admin' %}Admin (CA)
+          {% else %}CEO{% endif %}
+        </div>
+      </div>
+      <a href="/auth/logout" class="logout-btn" title="Logout">⏻</a>
+    </div>
+  </div>
+</aside>
+
+<div class="main-wrapper">
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+      <h1 class="topbar-title">{% block page_title %}Dashboard{% endblock %}</h1>
+    </div>
+
+    <div class="topbar-right">
+
+      <!-- 🔍 Search Bar -->
+      <form method="GET" action="/search/" style="display:flex;align-items:center;margin-right:12px;">
+        <input type="text" name="q"
+               placeholder="🔍 Search..."
+               style="background:var(--surface2);border:1px solid var(--border);
+                      border-radius:8px 0 0 8px;padding:6px 12px;color:var(--text);
+                      font-size:12px;outline:none;width:180px;transition:width 0.2s;"
+               onfocus="this.style.width='240px'"
+               onblur="this.style.width='180px'"/>
+        <button type="submit"
+                style="background:var(--rbl-red);border:none;border-radius:0 8px 8px 0;
+                       padding:6px 12px;color:white;cursor:pointer;font-size:12px;">
+          Go
+        </button>
+      </form>
+
+      <span class="fy-badge">FY 2026–27 Active</span>
+      <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙</button>
+    </div>
+  </header>
+
+  {% if flash_message %}
+  <div class="flash flash-{{ flash_type or 'success' }}">
+    {{ flash_message }}
+    <button onclick="this.parentElement.remove()">✕</button>
+  </div>
+  {% endif %}
+
+  <main class="page-content">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<div class="toast" id="toast">
+  <span class="toast-icon" id="toastIcon">✅</span>
+  <span class="toast-text" id="toastText">Done</span>
+</div>
+
+<script src="/static/js/main.js"></script>
+{% block extra_js %}{% endblock %}
+
+</body>
+</html>

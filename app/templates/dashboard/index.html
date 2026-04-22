@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — RBL IT Budget Portal{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div class="page-header-left">
+    <h2>Budget Overview</h2>
+    <p>FY 2025–26 actuals → FY 2026–27 planning cycle</p>
+  </div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi-card" style="--kpi-color:var(--rbl-red);">
+    <div class="kpi-label">Total Budget</div>
+    <div class="kpi-value">{% if kpi.total_budget %}₹{{ "%.1f"|format(kpi.total_budget/10000000) }}Cr{% else %}₹0{% endif %}</div>
+    <div class="kpi-sub">All lines · FY 25-26</div>
+  </div>
+  <div class="kpi-card" style="--kpi-color:var(--info);">
+    <div class="kpi-label">Budget Keys</div>
+    <div class="kpi-value">{{ kpi.budget_keys }}</div>
+    <div class="kpi-sub">Unique active keys</div>
+  </div>
+  <div class="kpi-card" style="--kpi-color:var(--success);">
+    <div class="kpi-label">IT Heads</div>
+    <div class="kpi-value">{{ kpi.it_heads }}</div>
+    <div class="kpi-sub">Submitted entries</div>
+  </div>
+  <div class="kpi-card" style="--kpi-color:var(--warning);">
+    <div class="kpi-label">Top Category</div>
+    <div class="kpi-value" style="font-size:13px;">{{ kpi.by_type.keys()|list|first if kpi.by_type else '—' }}</div>
+    <div class="kpi-sub">By budget amount</div>
+  </div>
+  <div class="kpi-card" style="--kpi-color:#AA88FF;">
+    <div class="kpi-label">Total Entries</div>
+    <div class="kpi-value">{{ recent_lines|length }}</div>
+    <div class="kpi-sub">All budget lines</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:18px;margin-bottom:18px;">
+  <div class="card">
+    <div class="card-title">Budget by IT Head (₹ Lakhs)</div>
+    <canvas id="barChart" height="200"></canvas>
+  </div>
+  <div class="card">
+    <div class="card-title">By Expense Type</div>
+    <canvas id="pieChart" height="200"></canvas>
+  </div>
+</div>
+
+<div class="card mt-24">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div class="card-title" style="margin:0;">Recent Budget Entries</div>
+    <a href="/budget/" class="btn btn-outline btn-sm">View All →</a>
+  </div>
+  {% if recent_lines %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Budget Key</th><th>Description</th><th>Type</th><th>Budget FY25-26</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for line in recent_lines %}
+        <tr>
+          <td class="mono">{{ line.budget_key_current }}</td>
+          <td>{{ line.description or line.expense_description or '—' }}</td>
+          <td><span class="badge badge-submitted">{{ line.expense_sub_type.value }}</span></td>
+          <td class="mono">₹{{ "{:,.0f}".format(line.budget_amt_current_fy) }}</td>
+          <td>
+            {% set s = line.status.value %}
+            {% if s == 'draft' %}<span class="badge badge-draft">Draft</span>
+            {% elif s == 'submitted' %}<span class="badge badge-submitted">Submitted</span>
+            {% elif s == 'admin_approved' %}<span class="badge badge-admin-app">CA Approved</span>
+            {% elif s == 'final_approved' %}<span class="badge badge-approved">Approved</span>
+            {% else %}<span class="badge badge-rejected">Rejected</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-icon">📊</div>
+    <div class="empty-title">No budget entries yet</div>
+    <div class="empty-sub">
+      {% if user.role.value == 'it_head' %}
+      <a href="/budget/new" class="btn btn-primary btn-sm" style="margin-top:12px;">+ Add First Entry</a>
+      {% else %}IT Heads haven't submitted entries yet.{% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+const grid   = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)';
+const tc     = isDark ? '#8888A0' : '#5A5A78';
+const labels = {{ it_head_data.keys()|list|tojson }};
+const budgets= {{ it_head_data.values()|map(attribute='budget')|list|tojson }};
+const proj   = {{ it_head_data.values()|map(attribute='projected')|list|tojson }};
+const byType = {{ kpi.by_type|tojson }};
+
+new Chart(document.getElementById('barChart'),{type:'bar',data:{labels,datasets:[
+  {label:'Budget FY25-26',data:budgets.map(v=>v/100000),backgroundColor:'rgba(200,16,46,0.75)',borderRadius:5},
+  {label:'Projected',data:proj.map(v=>v/100000),backgroundColor:'rgba(74,158,255,0.55)',borderRadius:5}
+]},options:{responsive:true,plugins:{legend:{labels:{color:tc,font:{size:11}}}},scales:{x:{ticks:{color:tc,font:{size:10}},grid:{color:grid}},y:{ticks:{color:tc},grid:{color:grid},title:{display:true,text:'₹ Lakhs',color:tc}}}}});
+
+new Chart(document.getElementById('pieChart'),{type:'doughnut',data:{
+  labels:Object.keys(byType),
+  datasets:[{data:Object.values(byType).map(v=>v/100000),
+    backgroundColor:['rgba(200,16,46,0.8)','rgba(74,158,255,0.8)','rgba(255,184,48,0.8)','rgba(0,200,150,0.8)','rgba(170,136,255,0.8)','rgba(255,100,100,0.8)','rgba(100,200,255,0.8)'],
+    borderColor:isDark?'#13131A':'#FFFFFF',borderWidth:3}]
+},options:{cutout:'62%',plugins:{legend:{labels:{color:tc,font:{size:10},padding:10}}}}});
+</script>
+{% endblock %}

@@ -1,0 +1,360 @@
+{% extends "base.html" %}
+{% block title %}Import Summary — RBL IT Budget Portal{% endblock %}
+{% block page_title %}Import Summary{% endblock %}
+
+{% block extra_css %}
+<style>
+.ei{background:var(--surface2);border:1px solid var(--border);border-radius:5px;
+    padding:4px 8px;color:var(--text);font-family:inherit;font-size:11px;width:100%;
+    outline:none;transition:border-color .15s;}
+.ei:focus{border-color:var(--rbl-red);}
+.es{background:var(--surface2);border:1px solid var(--border);border-radius:5px;
+    padding:4px 6px;color:var(--text);font-family:inherit;font-size:11px;
+    width:100%;outline:none;cursor:pointer;}
+.es:focus{border-color:var(--rbl-red);}
+.row-invalid{background:rgba(200,16,46,0.04);}
+.row-invalid td{opacity:0.8;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-left">
+    <h2>Validation Summary</h2>
+    <p>
+      {{ summary.file_name }}
+      <span style="font-size:11px;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;margin-left:8px;">
+        Ref: {{ correlation_id }}
+      </span>
+    </p>
+  </div>
+  <a href="/import/" class="btn btn-ghost">← Upload Different File</a>
+</div>
+
+<!-- MISSING COLUMNS WARNING -->
+{% if summary.missing_columns %}
+<div style="background:rgba(255,184,48,0.1);border:1px solid rgba(255,184,48,0.3);
+     border-radius:10px;padding:14px 18px;margin-bottom:20px;">
+  <div style="font-weight:700;color:var(--warning);margin-bottom:6px;">
+    ⚠️ Schema Warning — {{ summary.missing_columns|length }} expected columns not found
+  </div>
+  <div style="font-size:12px;color:var(--text-muted);">
+    Missing: {{ summary.missing_columns | join(', ') }}<br/>
+    <span style="font-size:11px;">Import may still work if data is in other columns. Check rows below carefully.</span>
+  </div>
+</div>
+{% endif %}
+
+<!-- KPI COUNTS -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;">
+  <div class="kpi-card" style="--kpi-color:var(--text-muted);">
+    <div class="kpi-label">Total Rows Found</div>
+    <div class="kpi-value">{{ summary.total }}</div>
+    <div class="kpi-sub">In Excel file</div>
+  </div>
+  <div class="kpi-card" style="--kpi-color:var(--success);">
+    <div class="kpi-label">Valid — Ready</div>
+    <div class="kpi-value" style="color:var(--success);">{{ summary.valid_count }}</div>
+    <div class="kpi-sub">Editable — select to import</div>
+  </div>
+  <div class="kpi-card" style="--kpi-color:var(--rbl-red);">
+    <div class="kpi-label">Errors — Skipped</div>
+    <div class="kpi-value" style="color:var(--rbl-light-red);">{{ summary.invalid_count }}</div>
+    <div class="kpi-sub">Fix in Excel and re-upload</div>
+  </div>
+  <div class="kpi-card" style="--kpi-color:var(--warning);">
+    <div class="kpi-label">Success Rate</div>
+    <div class="kpi-value" style="font-size:18px;">
+      {% if summary.total > 0 %}
+        {{ ((summary.valid_count / summary.total) * 100) | round(0) | int }}%
+      {% else %}—{% endif %}
+    </div>
+    <div class="kpi-sub">Valid / Total</div>
+  </div>
+</div>
+
+<!-- ALERTS -->
+{% if summary.invalid_count > 0 %}
+<div style="background:rgba(200,16,46,0.08);border:1px solid rgba(200,16,46,0.2);
+     border-radius:10px;padding:14px 20px;margin-bottom:18px;
+     display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+  <div>
+    <div style="font-weight:700;color:var(--rbl-light-red);margin-bottom:3px;">
+      ❌ {{ summary.invalid_count }} rows have errors — they will be skipped
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);">
+      Fix the errors in your Excel file and re-upload to import these rows.
+    </div>
+  </div>
+  {% if summary.has_error_report %}
+  <a href="/import/download-errors/{{ file_id }}" class="btn btn-danger btn-sm">
+    ⬇ Download Error Report
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if summary.valid_count == 0 %}
+<div class="card" style="text-align:center;padding:52px;">
+  <div style="font-size:48px;margin-bottom:14px;">❌</div>
+  <div style="font-size:18px;font-weight:700;margin-bottom:8px;">No valid rows to import</div>
+  <div style="font-size:13px;color:var(--text-muted);margin-bottom:20px;">
+    All {{ summary.total }} rows have validation errors.<br/>
+    Fix the issues and upload again.
+  </div>
+  {% if summary.has_error_report %}
+  <a href="/import/download-errors/{{ file_id }}" class="btn btn-danger" style="margin-right:10px;">
+    ⬇ Download Error Report (Excel)
+  </a>
+  {% endif %}
+  <a href="/import/" class="btn btn-primary">← Upload Again</a>
+</div>
+
+{% else %}
+<form method="POST" action="/import/confirm" id="confirmForm">
+  <input type="hidden" name="file_id" value="{{ file_id }}"/>
+  <input type="hidden" name="correlation_id" value="{{ correlation_id }}"/>
+
+  <!-- Controls bar -->
+  <div style="display:flex;align-items:center;justify-content:space-between;
+              margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button type="button" class="btn btn-outline btn-sm" onclick="filterRows('all')">
+        All ({{ summary.total }})
+      </button>
+      <button type="button" class="btn btn-outline btn-sm"
+              style="color:var(--success);border-color:var(--success);"
+              onclick="filterRows('valid')">
+        ✓ Valid ({{ summary.valid_count }})
+      </button>
+      {% if summary.invalid_count > 0 %}
+      <button type="button" class="btn btn-outline btn-sm"
+              style="color:var(--rbl-light-red);border-color:var(--rbl-light-red);"
+              onclick="filterRows('invalid')">
+        ✗ Errors ({{ summary.invalid_count }})
+      </button>
+      {% endif %}
+      <button type="button" class="btn btn-outline btn-sm" onclick="selectAll(true)">
+        Select All Valid
+      </button>
+      <button type="button" class="btn btn-outline btn-sm" onclick="selectAll(false)">
+        Deselect All
+      </button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span id="selectedCount" style="font-size:12px;color:var(--text-muted);">
+        {{ summary.valid_count }} selected
+      </span>
+      <button type="submit" class="btn btn-primary" onclick="return confirmImport()">
+        ✅ Save Selected as DRAFT
+      </button>
+    </div>
+  </div>
+
+  <!-- Editable Table -->
+  <div class="table-wrap" style="overflow-x:auto;margin-bottom:20px;">
+    <table id="summaryTable" style="min-width:1600px;">
+      <thead>
+        <tr>
+          <th style="width:36px;">✓</th>
+          <th>Row</th>
+          <th>Status</th>
+          <th style="min-width:120px;">Budget Key</th>
+          <th style="min-width:120px;">Old/New</th>
+          <th style="min-width:150px;">Business Name</th>
+          <th style="min-width:100px;">IT Head</th>
+          <th style="min-width:90px;">SPOC</th>
+          <th style="min-width:140px;">Expense Type</th>
+          <th style="min-width:90px;">Application</th>
+          <th style="min-width:100px;">Vendor</th>
+          <th style="min-width:110px;">Budget A ₹</th>
+          <th style="min-width:110px;">Projected B ₹</th>
+          <th style="min-width:110px;">Budget C ₹</th>
+          <th style="min-width:140px;">Description</th>
+          <th style="min-width:120px;">Reasoning</th>
+          <th style="min-width:200px;">Errors / Warnings</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in summary.rows %}
+        {% set rn = row.row_num %}
+        <tr class="{% if not row.valid %}row-invalid{% endif %}"
+            data-valid="{{ 'true' if row.valid else 'false' }}">
+
+          <!-- Checkbox -->
+          <td style="text-align:center;">
+            {% if row.valid %}
+            <input type="checkbox" name="import_row_{{ rn }}" value="1" checked
+                   class="rowcb" onchange="updateCount()"
+                   style="width:16px;height:16px;cursor:pointer;accent-color:var(--rbl-red);"/>
+            {% else %}
+            <span style="color:var(--text-faint);font-size:10px;">—</span>
+            {% endif %}
+          </td>
+
+          <td style="font-size:10px;color:var(--text-muted);" class="mono">{{ rn }}</td>
+
+          <td>
+            {% if row.valid %}
+            <span class="badge badge-approved" style="font-size:9px;">✓ Valid</span>
+            {% else %}
+            <span class="badge badge-rejected" style="font-size:9px;">✗ Error</span>
+            {% endif %}
+          </td>
+
+          {% if row.valid %}
+          <!-- Editable fields -->
+          <td><input type="text" class="ei mono" name="row_{{ rn }}_budget_key"
+               value="{{ row.budget_key }}"/></td>
+          <td>
+            <select class="es" name="row_{{ rn }}_old_new">
+              {% for v in VALID_OLD_NEW %}
+              <option value="{{ v }}" {% if row.old_new == v %}selected{% endif %}>{{ v }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td>
+            <select class="es" name="row_{{ rn }}_business">
+              {% for b in BUSINESS_NAMES %}
+              <option value="{{ b }}" {% if row.business == b %}selected{% endif %}>{{ b }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td><input type="text" class="ei" name="row_{{ rn }}_it_head" value="{{ row.it_head }}"/></td>
+          <td><input type="text" class="ei" name="row_{{ rn }}_spoc" value="{{ row.spoc }}"/></td>
+          <td>
+            <select class="es" name="row_{{ rn }}_expense_type">
+              {% for e in VALID_EXPENSE_TYPES %}
+              <option value="{{ e }}" {% if row.expense_type == e %}selected{% endif %}>{{ e }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td><input type="text" class="ei" name="row_{{ rn }}_application" value="{{ row.application }}"/></td>
+          <td><input type="text" class="ei" name="row_{{ rn }}_vendor" value="{{ row.vendor }}"/></td>
+          <td><input type="number" class="ei mono" name="row_{{ rn }}_budget_a"
+               value="{{ row.budget_a or '' }}" min="0" step="1" placeholder="Required"/></td>
+          <td><input type="number" class="ei mono" name="row_{{ rn }}_projected_b"
+               value="{{ row.projected_b or '' }}" min="0" step="1" placeholder="Optional"/></td>
+          <td><input type="number" class="ei mono" name="row_{{ rn }}_budget_c"
+               value="{{ row.budget_c or '' }}" min="0" step="1" placeholder="Required"/></td>
+          <td><input type="text" class="ei" name="row_{{ rn }}_description" value="{{ row.description }}"/></td>
+          <td><input type="text" class="ei" name="row_{{ rn }}_reasoning" value="{{ row.reasoning }}"/></td>
+
+          {% else %}
+          <!-- Read-only invalid rows -->
+          <td class="mono" style="font-size:10px;color:var(--text-muted);">{{ row.budget_key or '—' }}</td>
+          <td style="font-size:10px;">{{ row.old_new or '—' }}</td>
+          <td style="font-size:10px;">{{ row.business or '—' }}</td>
+          <td style="font-size:10px;">{{ row.it_head or '—' }}</td>
+          <td style="font-size:10px;">{{ row.spoc or '—' }}</td>
+          <td style="font-size:10px;">{{ row.expense_type or '—' }}</td>
+          <td style="font-size:10px;">{{ row.application or '—' }}</td>
+          <td style="font-size:10px;">{{ row.vendor or '—' }}</td>
+          <td class="mono" style="font-size:10px;">{{ row.budget_a or '—' }}</td>
+          <td class="mono" style="font-size:10px;">{{ row.projected_b or '—' }}</td>
+          <td class="mono" style="font-size:10px;">{{ row.budget_c or '—' }}</td>
+          <td style="font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            {{ (row.description or '')[:40] }}
+          </td>
+          <td style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            {{ (row.reasoning or '')[:30] }}
+          </td>
+          {% endif %}
+
+          <!-- Errors + Warnings column -->
+          <td style="min-width:200px;">
+            {% if row.errors %}
+            <div style="font-size:10px;color:var(--rbl-light-red);">
+              {% for e in row.errors %}
+              <div style="margin-bottom:2px;">✗ {{ e }}</div>
+              {% endfor %}
+            </div>
+            {% endif %}
+            {% if row.warnings %}
+            <div style="font-size:10px;color:var(--warning);margin-top:{% if row.errors %}4{% else %}0{% endif %}px;">
+              {% for w in row.warnings %}
+              <div style="margin-bottom:2px;">⚠ {{ w }}</div>
+              {% endfor %}
+            </div>
+            {% endif %}
+            {% if not row.errors and not row.warnings %}
+            <span style="font-size:10px;color:var(--success);">All good ✓</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Bottom confirm bar -->
+  <div style="background:var(--surface);border:1px solid rgba(0,200,150,0.2);border-radius:12px;
+              padding:20px 24px;display:flex;align-items:center;justify-content:space-between;
+              flex-wrap:wrap;gap:12px;">
+    <div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px;">
+        Ready to import selected rows
+      </div>
+      <div style="font-size:13px;color:var(--text-muted);">
+        All selected rows saved as <strong>DRAFT</strong>.
+        You can edit and submit for approval from Budget Lines.
+        {% if summary.invalid_count > 0 %}
+        <span style="color:var(--rbl-light-red);">
+          {{ summary.invalid_count }} invalid rows will be skipped.
+        </span>
+        {% endif %}
+      </div>
+      <div style="font-size:11px;color:var(--text-faint);margin-top:4px;font-family:'IBM Plex Mono',monospace;">
+        Trace ID: {{ correlation_id }}
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      {% if summary.has_error_report and summary.invalid_count > 0 %}
+      <a href="/import/download-errors/{{ file_id }}" class="btn btn-outline btn-sm">
+        ⬇ Error Report
+      </a>
+      {% endif %}
+      <button type="submit" class="btn btn-primary btn-lg" onclick="return confirmImport()">
+        ✅ Confirm Import (<span id="confirmCount">{{ summary.valid_count }}</span> rows)
+      </button>
+    </div>
+  </div>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterRows(type) {
+  document.querySelectorAll('#summaryTable tbody tr').forEach(row => {
+    const v = row.dataset.valid === 'true';
+    row.style.display = (type==='all') ? '' : ((type==='valid') === v) ? '' : 'none';
+  });
+}
+
+function selectAll(state) {
+  document.querySelectorAll('.rowcb').forEach(cb => cb.checked = state);
+  updateCount();
+}
+
+function updateCount() {
+  const n = document.querySelectorAll('.rowcb:checked').length;
+  const cc = document.getElementById('confirmCount');
+  const sc = document.getElementById('selectedCount');
+  if (cc) cc.textContent = n;
+  if (sc) sc.textContent = n + ' selected';
+}
+
+function confirmImport() {
+  const n = document.querySelectorAll('.rowcb:checked').length;
+  if (n === 0) {
+    showToast('Please select at least one row to import.', 'error');
+    return false;
+  }
+  return confirm(
+    `Import ${n} selected row(s) as DRAFT entries?\n\n` +
+    `You can review and submit them for approval from Budget Lines.`
+  );
+}
+</script>
+{% endblock %}

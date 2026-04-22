@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+{% block title %}Import Excel — RBL IT Budget Portal{% endblock %}
+{% block page_title %}Import Budget Data{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-left">
+    <h2>Import Budget Lines from Excel</h2>
+    <p>Upload your GRC_2_0_STEP1_AUTOMATED Excel file — every row is validated before saving</p>
+  </div>
+  <a href="/budget/" class="btn btn-ghost">← Budget Lines</a>
+</div>
+
+<!-- ERROR ALERT — shown when redirected with error param -->
+{% if error %}
+<div id="errorAlert" style="background:rgba(200,16,46,0.12);border:1px solid rgba(200,16,46,0.35);
+     border-radius:10px;padding:16px 20px;margin-bottom:22px;display:flex;align-items:flex-start;gap:12px;">
+  <span style="font-size:20px;flex-shrink:0;">❌</span>
+  <div style="flex:1;">
+    <div style="font-weight:700;color:var(--rbl-light-red);margin-bottom:4px;">Upload Failed</div>
+    <div style="font-size:13px;color:var(--text-muted);">{{ error }}</div>
+  </div>
+  <button onclick="document.getElementById('errorAlert').remove()"
+          style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px;">✕</button>
+</div>
+{% endif %}
+
+<!-- UPLOAD CARD -->
+<div class="card mb-24">
+  <div class="card-title">Upload Excel File</div>
+
+  <form method="POST" action="/import/upload" enctype="multipart/form-data" id="uploadForm"
+        onsubmit="return onFormSubmit()">
+
+    <!-- Drop Zone -->
+    <div id="dropZone"
+         style="border:2px dashed var(--border-strong);border-radius:12px;padding:52px 24px;
+                text-align:center;cursor:pointer;transition:all 0.25s;background:var(--surface2);
+                margin-bottom:20px;"
+         onclick="document.getElementById('fileInput').click()"
+         ondragover="onDragOver(event)"
+         ondragleave="onDragLeave(event)"
+         ondrop="onDrop(event)">
+
+      <div id="dropIcon" style="font-size:48px;margin-bottom:14px;">📊</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:6px;">Drop your Excel file here</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:4px;">or click to browse</div>
+      <div style="font-size:11px;color:var(--text-faint);">
+        .xlsx or .xls only · Max 10MB · Sheet1 from GRC_2_0_STEP1_AUTOMATED
+      </div>
+
+      <!-- File info (shown after selection) -->
+      <div id="fileInfo" style="display:none;margin-top:18px;padding:12px 20px;
+           background:rgba(0,200,150,0.08);border:1px solid rgba(0,200,150,0.25);
+           border-radius:8px;display:none;">
+        <div id="fileNameDisplay" style="font-size:14px;font-weight:700;color:var(--success);"></div>
+        <div id="fileSizeDisplay" style="font-size:11px;color:var(--text-muted);margin-top:3px;"></div>
+      </div>
+    </div>
+
+    <input type="file" id="fileInput" name="file" accept=".xlsx,.xls"
+           style="display:none" onchange="onFileSelect(this)"/>
+
+    <!-- Loading state (shown during upload) -->
+    <div id="uploadProgress" style="display:none;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;
+           background:var(--surface2);border-radius:9px;border:1px solid var(--border);">
+        <div style="width:20px;height:20px;border:2px solid var(--rbl-red);
+             border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;
+             flex-shrink:0;"></div>
+        <div>
+          <div style="font-size:13px;font-weight:600;">Uploading and validating...</div>
+          <div id="progressMsg" style="font-size:11px;color:var(--text-muted);margin-top:2px;">
+            Reading file and checking all rows
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+      <div style="font-size:12px;color:var(--text-muted);">
+        Expected: <strong>Sheet1</strong> with columns as per GRC_2_0_STEP1_AUTOMATED format
+      </div>
+      <button type="submit" class="btn btn-primary" id="uploadBtn" disabled>
+        📤 Upload &amp; Validate
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- WHAT HAPPENS SECTION -->
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:24px;">
+  <div class="card" style="border-color:rgba(74,158,255,0.2);">
+    <div style="font-size:22px;margin-bottom:8px;">📋</div>
+    <div style="font-size:12px;font-weight:700;margin-bottom:6px;">Step 1 — Validate</div>
+    <div style="font-size:11px;color:var(--text-muted);line-height:1.8;">
+      Every row checked for:<br/>
+      Budget Key, Business Name,<br/>
+      Expense Type, Amounts A & C,<br/>
+      Duplicate keys in DB
+    </div>
+  </div>
+  <div class="card" style="border-color:rgba(255,184,48,0.2);">
+    <div style="font-size:22px;margin-bottom:8px;">✏️</div>
+    <div style="font-size:12px;font-weight:700;margin-bottom:6px;">Step 2 — Review & Edit</div>
+    <div style="font-size:11px;color:var(--text-muted);line-height:1.8;">
+      Summary page shows all rows.<br/>
+      Valid rows are editable.<br/>
+      Invalid rows shown with errors.<br/>
+      Download error report if needed.
+    </div>
+  </div>
+  <div class="card" style="border-color:rgba(0,200,150,0.2);">
+    <div style="font-size:22px;margin-bottom:8px;">💾</div>
+    <div style="font-size:12px;font-weight:700;margin-bottom:6px;">Step 3 — Confirm</div>
+    <div style="font-size:11px;color:var(--text-muted);line-height:1.8;">
+      Select rows to import.<br/>
+      Saved as DRAFT status.<br/>
+      Submit for approval later.<br/>
+      Full audit trail logged.
+    </div>
+  </div>
+</div>
+
+<!-- VALIDATION RULES -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+  <div class="card">
+    <div class="card-title" style="color:var(--rbl-light-red);">❌ Row SKIPPED if:</div>
+    <div style="font-size:12px;color:var(--text-muted);line-height:2.2;">
+      Budget Key (Column A) missing<br/>
+      Old/New not in: Old / Old But Incremental / New<br/>
+      Business Name not in master list (7 values)<br/>
+      Expense Sub Type not in master list (7 values)<br/>
+      Final Budget A — missing or not a number<br/>
+      Budget FY 26-27 C — missing or not a number<br/>
+      Budget Key already exists in database
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title" style="color:var(--warning);">⚠️ Row SAVED with warning:</div>
+    <div style="font-size:12px;color:var(--text-muted);line-height:2.2;">
+      Expense Description empty<br/>
+      Detailed Reasoning empty<br/>
+      Projected Consumption (B) empty — fillable later<br/>
+      Vendor Name empty<br/>
+      IT Head name empty<br/><br/>
+      <span style="color:var(--success);font-size:11px;">
+        ✅ Saved rows → DRAFT status → submit for approval later
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- UPLOAD HISTORY -->
+{% if history %}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div class="card-title" style="margin:0;">Upload History</div>
+    <span style="font-size:11px;color:var(--text-muted);">Last 10 uploads</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>File Name</th>
+          <th>Uploaded At</th>
+          <th>Total Rows</th>
+          <th>Imported</th>
+          <th>Failed</th>
+          <th>Status</th>
+          <th>Error Report</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in history %}
+        <tr>
+          <td style="font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            {{ h.original_name }}
+          </td>
+          <td style="font-size:12px;color:var(--text-muted);">
+            {{ h.upload_at.strftime('%d %b %Y  %H:%M') if h.upload_at else '—' }}
+          </td>
+          <td class="mono">{{ h.rows_total or '—' }}</td>
+          <td class="mono text-success">{{ h.rows_imported or 0 }}</td>
+          <td class="mono {% if h.rows_failed %}text-danger{% else %}text-success{% endif %}">
+            {{ h.rows_failed or 0 }}
+          </td>
+          <td>
+            {% if h.status == 'processed' %}<span class="badge badge-approved">Processed</span>
+            {% elif h.status == 'pending' %}<span class="badge badge-submitted">Pending</span>
+            {% elif h.status == 'failed' %}<span class="badge badge-rejected">Failed</span>
+            {% else %}<span class="badge badge-draft">{{ h.status }}</span>{% endif %}
+          </td>
+          <td>
+            {% if h.error_report_path %}
+            <a href="/import/download-errors/{{ h.id }}" class="btn btn-danger btn-sm"
+               style="font-size:10px;padding:4px 10px;">
+              ⬇ Download
+            </a>
+            {% else %}
+            <span style="font-size:11px;color:var(--text-faint);">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function onFileSelect(input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const ext  = file.name.split('.').pop().toLowerCase();
+
+  if (ext !== 'xlsx' && ext !== 'xls') {
+    showAlert('Only .xlsx or .xls files are allowed. You selected: .' + ext, 'error');
+    input.value = '';
+    return;
+  }
+
+  const sizeMB = file.size / (1024 * 1024);
+  if (sizeMB > 10) {
+    showAlert(`File size ${sizeMB.toFixed(1)}MB exceeds the 10MB limit.`, 'error');
+    input.value = '';
+    return;
+  }
+
+  document.getElementById('fileNameDisplay').textContent = '✅ ' + file.name;
+  document.getElementById('fileSizeDisplay').textContent =
+    'Size: ' + sizeMB.toFixed(2) + ' MB';
+  const fi = document.getElementById('fileInfo');
+  fi.style.display = 'block';
+  document.getElementById('dropZone').style.borderColor = 'var(--success)';
+  document.getElementById('dropZone').style.background  = 'rgba(0,200,150,0.04)';
+  document.getElementById('dropIcon').textContent = '✅';
+  document.getElementById('uploadBtn').disabled = false;
+}
+
+function onFormSubmit() {
+  const fi = document.getElementById('fileInput');
+  if (!fi.files || !fi.files[0]) {
+    showAlert('Please select a file first.', 'error');
+    return false;
+  }
+  // Show progress
+  document.getElementById('uploadProgress').style.display = 'block';
+  document.getElementById('uploadBtn').disabled = true;
+  document.getElementById('uploadBtn').textContent = 'Uploading...';
+
+  // Progress message rotation
+  const msgs = [
+    'Reading file...',
+    'Detecting sheet structure...',
+    'Parsing rows...',
+    'Validating fields...',
+    'Checking duplicates...',
+    'Almost done...',
+  ];
+  let i = 0;
+  const pm = document.getElementById('progressMsg');
+  const timer = setInterval(() => {
+    if (i < msgs.length - 1) { pm.textContent = msgs[++i]; }
+  }, 1200);
+
+  return true;
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').style.borderColor = 'var(--rbl-red)';
+  document.getElementById('dropZone').style.background  = 'rgba(200,16,46,0.04)';
+}
+function onDragLeave(e) {
+  document.getElementById('dropZone').style.borderColor = 'var(--border-strong)';
+  document.getElementById('dropZone').style.background  = 'var(--surface2)';
+}
+function onDrop(e) {
+  e.preventDefault();
+  onDragLeave(e);
+  const files = e.dataTransfer.files;
+  if (files.length > 0) {
+    try {
+      const dt = new DataTransfer();
+      dt.items.add(files[0]);
+      document.getElementById('fileInput').files = dt.files;
+    } catch(err) { /* older browsers */ }
+    onFileSelect(document.getElementById('fileInput'));
+  }
+}
+
+function showAlert(msg, type) {
+  const colors = {
+    error  : 'rgba(200,16,46,0.12)',
+    success: 'rgba(0,200,150,0.12)',
+    warning: 'rgba(255,184,48,0.12)',
+  };
+  const icons = { error: '❌', success: '✅', warning: '⚠️' };
+  const a = document.createElement('div');
+  a.style.cssText = `background:${colors[type]};border-radius:10px;padding:14px 18px;
+    margin-bottom:16px;display:flex;gap:10px;align-items:center;font-size:13px;`;
+  a.innerHTML = `<span>${icons[type]}</span><span>${msg}</span>`;
+  document.querySelector('.page-content').prepend(a);
+  setTimeout(() => a.remove(), 5000);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Approvals — RBL IT Budget Portal{% endblock %}
+{% block page_title %}Approvals{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div class="page-header-left">
+    <h2>
+      {% if user.role.value == 'admin' %}Pending CA Review
+      {% elif user.role.value == 'super_admin' %}Pending CEO Approval
+      {% else %}My Budget Status{% endif %}
+    </h2>
+    <p>
+      {% if user.role.value == 'admin' %}Review submitted entries and forward to CEO
+      {% elif user.role.value == 'super_admin' %}CA-verified entries awaiting your final approval
+      {% else %}Track the status of your submitted budget entries{% endif %}
+    </p>
+  </div>
+</div>
+
+{% if pending %}
+  {% if user.role.value == 'it_head' %}
+  <!-- IT HEAD: Read-only status view -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Budget Key</th><th>Description</th><th>Type</th>
+          <th>Budget A</th><th>Budget C</th><th>Status</th><th>Last Updated</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for line in pending %}
+        <tr>
+          <td class="mono">{{ line.budget_key_current }}</td>
+          <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            {{ line.description or line.expense_description or '—' }}
+          </td>
+          <td><span class="badge badge-submitted" style="font-size:9px;">{{ line.expense_sub_type.value }}</span></td>
+          <td class="mono">₹{{ "{:,.0f}".format(line.budget_amt_current_fy) }}</td>
+          <td class="mono">₹{{ "{:,.0f}".format(line.budget_amt_next_fy) }}</td>
+          <td>
+            {% set s = line.status.value %}
+            {% if s == 'draft' %}<span class="badge badge-draft">Draft</span>
+            {% elif s == 'submitted' %}<span class="badge badge-submitted">Awaiting CA</span>
+            {% elif s == 'admin_approved' %}<span class="badge badge-admin-app">Awaiting CEO</span>
+            {% elif s == 'final_approved' %}<span class="badge badge-approved">✓ Approved</span>
+            {% elif s == 'rejected_by_admin' %}<span class="badge badge-rejected">Rejected by CA</span>
+            {% else %}<span class="badge badge-rejected">Rejected by CEO</span>{% endif %}
+          </td>
+          <td style="font-size:11px;color:var(--text-muted);">
+            {{ line.updated_at.strftime('%d %b %Y') if line.updated_at else '—' }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% else %}
+  <!-- ADMIN / CEO: Approve / Reject Cards -->
+  {% for line in pending %}
+  <div class="approval-card">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;">
+      <div>
+        <div class="approval-card-title">{{ line.description or line.expense_description or line.budget_key_current }}</div>
+        <div class="approval-card-meta">
+          {{ line.budget_key_current }} ·
+          {{ line.it_head_name or '—' }} ·
+          {{ line.business_name }} ·
+          <span class="badge badge-submitted" style="font-size:9px;">{{ line.expense_sub_type.value }}</span>
+          {% if line.application_platform %} · {{ line.application_platform }}{% endif %}
+        </div>
+      </div>
+      <span class="badge badge-submitted">Awaiting Approval</span>
+    </div>
+
+    <div class="approval-amounts">
+      <div class="amt-box">
+        <div class="amt-label">Budget FY 25-26 (A)</div>
+        <div class="amt-value">₹{{ "{:,.0f}".format(line.budget_amt_current_fy) }}</div>
+      </div>
+      <div class="amt-box">
+        <div class="amt-label">Projected (B)</div>
+        <div class="amt-value">{% if line.projected_consumption is not none %}₹{{ "{:,.0f}".format(line.projected_consumption) }}{% else %}—{% endif %}</div>
+      </div>
+      <div class="amt-box">
+        <div class="amt-label">Budget FY 26-27 (C)</div>
+        <div class="amt-value">₹{{ "{:,.0f}".format(line.budget_amt_next_fy) }}</div>
+      </div>
+    </div>
+
+    {% if line.diff_a_minus_b is not none or line.diff_c_minus_a is not none %}
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;">
+      {% if line.diff_a_minus_b is not none %}
+      A−B: <span style="font-weight:700;font-family:'IBM Plex Mono',monospace;color:{{ 'var(--success)' if line.diff_a_minus_b >= 0 else 'var(--rbl-light-red)' }};">
+        {{ '+' if line.diff_a_minus_b >= 0 else '−' }} ₹{{ "{:,.0f}".format(line.diff_a_minus_b|abs) }}
+      </span>
+      {% endif %}
+      &nbsp;&nbsp;
+      {% if line.diff_c_minus_a is not none %}
+      C−A: <span style="font-weight:700;font-family:'IBM Plex Mono',monospace;color:{{ 'var(--success)' if line.diff_c_minus_a >= 0 else 'var(--rbl-light-red)' }};">
+        {{ '+' if line.diff_c_minus_a >= 0 else '−' }} ₹{{ "{:,.0f}".format(line.diff_c_minus_a|abs) }}
+      </span>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if line.detailed_reasoning %}
+    <div style="background:var(--surface2);border-radius:9px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:var(--text-muted);line-height:1.6;">
+      <strong style="color:var(--text);font-size:10px;text-transform:uppercase;letter-spacing:.5px;">Reasoning:</strong><br/>
+      {{ line.detailed_reasoning[:300] }}{% if line.detailed_reasoning|length > 300 %}…{% endif %}
+    </div>
+    {% endif %}
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;align-items:center;">
+      <!-- Reject form -->
+      <form method="POST" action="/approval/{{ line.id }}/reject"
+            onsubmit="return validateReject(this)" style="display:flex;gap:8px;align-items:center;flex:1;">
+        <input class="field-input" type="text" name="comment"
+               placeholder="Rejection reason (required)" style="flex:1;margin:0;font-size:12px;padding:8px 12px;"/>
+        <button type="submit" class="btn btn-danger btn-sm">✕ Reject</button>
+      </form>
+      <!-- Approve form -->
+      <form method="POST" action="/approval/{{ line.id }}/approve"
+            onsubmit="return confirm('Approve this budget entry?')">
+        <input type="hidden" name="comment" value="Approved"/>
+        <button type="submit" class="btn btn-success btn-sm">
+          {% if user.role.value == 'admin' %}✓ Approve → CEO{% else %}✓ Final Approve{% endif %}
+        </button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+{% else %}
+<div class="card">
+  <div class="empty-state">
+    <div class="empty-icon">✅</div>
+    <div class="empty-title">
+      {% if user.role.value == 'it_head' %}No entries yet
+      {% else %}All clear — nothing pending{% endif %}
+    </div>
+    <div class="empty-sub">
+      {% if user.role.value == 'it_head' %}
+      <div style="display:flex;gap:10px;justify-content:center;margin-top:14px;">
+        <a href="/budget/new" class="btn btn-primary btn-sm">+ Add Entry</a>
+        <a href="/import/" class="btn btn-outline btn-sm">📥 Import Excel</a>
+      </div>
+      {% else %}No entries are waiting for your review right now.{% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function validateReject(form) {
+  const c = form.querySelector('input[name="comment"]').value.trim();
+  if (!c) { showToast('Please enter a rejection reason before rejecting.', 'error'); return false; }
+  return confirm('Reject this entry with the given reason?');
+}
+</script>
+{% endblock %}

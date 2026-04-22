@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login — RBL Bank IT Budget Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/css/style.css"/>
+  <style>
+    body{display:flex;align-items:center;justify-content:center;min-height:100vh;
+      background:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(200,16,46,0.18),transparent),var(--bg);}
+    .lg{position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(200,16,46,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(200,16,46,0.04) 1px,transparent 1px);background-size:56px 56px;pointer-events:none;}
+    .lw{position:relative;z-index:1;width:100%;max-width:420px;padding:20px;}
+    .lc{background:var(--surface);border:1px solid rgba(200,16,46,0.18);border-radius:20px;padding:44px 40px;box-shadow:0 0 80px rgba(200,16,46,0.09),0 20px 60px rgba(0,0,0,.6);}
+    .ll{display:flex;align-items:center;gap:12px;margin-bottom:32px;}
+    .lt{font-size:24px;font-weight:700;margin-bottom:4px;}
+    .ls{font-size:13px;color:var(--text-muted);margin-bottom:28px;}
+    .eb{background:rgba(200,16,46,0.1);border:1px solid rgba(200,16,46,0.25);border-radius:9px;padding:11px 14px;font-size:13px;color:var(--rbl-light-red);margin-bottom:18px;}
+    .da{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:20px;}
+    .dt{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:10px;}
+    .dr{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;}
+    .dr:last-child{border-bottom:none;padding-bottom:0;}
+    .drole{font-weight:600;color:var(--text);}
+    .dinfo{color:var(--text-muted);font-family:'IBM Plex Mono',monospace;font-size:10px;}
+    .tb{position:fixed;top:20px;right:20px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:16px;z-index:10;}
+  </style>
+</head>
+<body>
+  <div class="lg"></div>
+  <button class="tb" onclick="toggleTheme()" id="themeBtn">🌙</button>
+  <div class="lw">
+    <div class="lc">
+      <div class="ll">
+        <img src="/static/images/rbl-logo.png" alt="RBL"
+             style="width:46px;height:46px;border-radius:12px;object-fit:contain;background:white;padding:4px;"
+             onerror="this.outerHTML='<div class=\'logo-mark\' style=\'width:46px;height:46px;font-size:18px;border-radius:12px;\'>₹B</div>'"/>
+        <div>
+          <div style="font-size:17px;font-weight:800;">RBL Bank</div>
+          <div style="font-size:11px;color:var(--text-muted);">IT Budget Management Portal</div>
+        </div>
+      </div>
+      <div class="lt">Welcome back</div>
+      <div class="ls">Sign in to access your budget workspace</div>
+
+      {% if error %}
+      <div class="eb">⚠️ {{ error }}</div>
+      {% endif %}
+
+      <form method="POST" action="/auth/login">
+        <div class="field-group">
+          <label class="field-label field-required">Email Address</label>
+          <input class="field-input" type="email" name="email" placeholder="yourname@rblbank.com" required autofocus/>
+        </div>
+        <div class="field-group">
+          <label class="field-label field-required">Password</label>
+          <input class="field-input" type="password" name="password" placeholder="Enter your password" required/>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full btn-lg" style="margin-top:8px;">Sign In →</button>
+      </form>
+
+      <div class="da">
+        <div class="dt">🧪 Demo Accounts (Prototype)</div>
+        <div class="dr">
+          <span class="drole">IT Head</span>
+          <span class="dinfo">kunal.dhingra@rblbank.com</span>
+          <span class="dinfo">Pass@1234</span>
+        </div>
+        <div class="dr">
+          <span class="drole">IT Head 2</span>
+          <span class="dinfo">bharat.agroya@rblbank.com</span>
+          <span class="dinfo">Pass@1234</span>
+        </div>
+        <div class="dr">
+          <span class="drole">Admin CA</span>
+          <span class="dinfo">kavita.nair@rblbank.com</span>
+          <span class="dinfo">Pass@1234</span>
+        </div>
+        <div class="dr">
+          <span class="drole">CEO</span>
+          <span class="dinfo">vishwavir.ahuja@rblbank.com</span>
+          <span class="dinfo">Pass@1234</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="/static/js/main.js"></script>
+</body>
+</html>

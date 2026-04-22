@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Search — RBL IT Budget Portal{% endblock %}
+{% block page_title %}Search Results{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-left">
+    <h2>Search Results</h2>
+    <p>
+      {% if q %}
+        {% if total > 0 %}
+          {{ total }} result{{ 's' if total != 1 else '' }} for "<strong>{{ q }}</strong>"
+        {% else %}
+          No results for "<strong>{{ q }}</strong>"
+        {% endif %}
+      {% else %}
+        Enter a search term above
+      {% endif %}
+    </p>
+  </div>
+</div>
+
+<form method="GET" action="/search/" style="margin-bottom:24px;">
+  <div style="display:flex;gap:10px;max-width:600px;">
+    <input type="text" name="q" value="{{ q }}"
+           class="field-input"
+           placeholder="Search budget key, vendor, application, IT head..."
+           style="flex:1;font-size:15px;" autofocus/>
+    <button type="submit" class="btn btn-primary">🔍 Search</button>
+    {% if q %}
+    <a href="/search/" class="btn btn-ghost">✕ Clear</a>
+    {% endif %}
+  </div>
+</form>
+
+<div style="font-size:12px;color:var(--text-muted);margin-bottom:20px;">
+  Searching in:
+  <span class="tag">Budget Key</span>
+  <span class="tag">Description</span>
+  <span class="tag">Vendor</span>
+  <span class="tag">Application</span>
+  <span class="tag">Business Name</span>
+  <span class="tag">IT Head</span>
+</div>
+
+{% if not q %}
+<div class="card center-box">
+  <div class="big-icon">🔍</div>
+  <div class="title">What are you looking for?</div>
+  <div class="subtitle">
+    Search by Budget Key, Vendor name, Application, IT Head, or any description text
+  </div>
+</div>
+
+{% elif total == 0 %}
+<div class="card center-box">
+  <div class="big-icon">🤷</div>
+  <div class="title">No results found for "{{ q }}"</div>
+  <div class="subtitle">Try a different keyword or check spelling</div>
+  <a href="/budget/" class="btn btn-outline btn-sm">View All Budget Lines</a>
+</div>
+
+{% else %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Budget Key</th>
+        <th>Description</th>
+        {% if user.role.value != 'it_head' %}<th>IT Head</th>{% endif %}
+        <th>Business</th>
+        <th>Expense Type</th>
+        <th>Vendor / Application</th>
+        <th>Budget A</th>
+        <th>Budget C</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for line in results %}
+      <tr onclick="window.location='/budget/'" style="cursor:pointer;">
+        
+        <!-- ✅ SAFE fallback: no crash if highlight not present -->
+        <td class="mono" style="font-size:11px;">
+          {% if highlight is defined %}
+            {{ line.budget_key_current | highlight(q) | safe }}
+          {% else %}
+            {{ line.budget_key_current }}
+          {% endif %}
+        </td>
+
+        <td style="max-width:200px;">
+          <div class="ellipsis">
+            {{ (line.description or line.expense_description or '—') }}
+          </div>
+        </td>
+
+        {% if user.role.value != 'it_head' %}
+        <td style="font-size:12px;">{{ line.it_head_name or '—' }}</td>
+        {% endif %}
+
+        <td style="font-size:11px;">{{ line.business_name }}</td>
+
+        <td>
+          <span class="badge badge-submitted" style="font-size:9px;">
+            {{ line.expense_sub_type.value }}
+          </span>
+        </td>
+
+        <td class="muted">
+          {{ line.vendor_name or line.application_platform or '—' }}
+        </td>
+
+        <td class="mono">₹{{ "{:,.0f}".format(line.budget_amt_current_fy) }}</td>
+        <td class="mono">₹{{ "{:,.0f}".format(line.budget_amt_next_fy) }}</td>
+
+        <td>
+          {% set s = line.status.value %}
+          {% if s == 'draft' %}<span class="badge badge-draft">Draft</span>
+          {% elif s == 'submitted' %}<span class="badge badge-submitted">Submitted</span>
+          {% elif s == 'admin_approved' %}<span class="badge badge-admin-app">CA Approved</span>
+          {% elif s == 'final_approved' %}<span class="badge badge-approved">Approved</span>
+          {% else %}<span class="badge badge-rejected">Rejected</span>{% endif %}
+        </td>
+
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if total == 50 %}
+<div class="muted-center">
+  Showing top 50 results. Refine your search.
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}
