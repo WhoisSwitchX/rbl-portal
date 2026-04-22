@@ -49,6 +49,15 @@ def highlight(text, query):
     return Markup(highlighted)
 
 
+
+@app.get("/reset-db")
+def reset_db():
+    import os
+    if os.path.exists("rbl_budget.db"):
+        os.remove("rbl_budget.db")
+    return {"status": "DB deleted"}
+
+
 templates.env.filters["highlight"] = highlight
 
 # ── Request Logging Middleware ────────────────────────────────
